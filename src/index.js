@@ -102,64 +102,83 @@ var index = (function () {
                 return;
             }
 
+            var map1Source = new Image();
 
+            map1Source.src = "./src/assets/images/logo.png";
 
-            // Create the path tracing program, grab the uniforms.
-            var program = createProgram(gl, trace_vertex, trace_fragment);
-            var timeLocation = gl.getUniformLocation(program, 'uTime');
-            // var pLocation = gl.getUniformLocation(program, 'proj');
-            // var uniformgridLocation = gl.getUniformLocation(program, 'grid');
-            // var uniformtrisLocation = gl.getUniformLocation(program, 'tris');
-            // var uniformSeed = gl.getUniformLocation(program, 'inseed');
-            // var uniformCount = gl.getUniformLocation(program, 'incount');
-            // var uniformbbaLocation = gl.getUniformLocation(program, 'bbina');
-            // var uniformbbbLocation = gl.getUniformLocation(program, 'bbinb');
-            // var uniformresLocation = gl.getUniformLocation(program, 'resolution');
-
-
-            // Setup the quad that will drive the rendering.
-            var vertexPosBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexPosBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-                -2, 0,
-                0, -2,
-                2, 2
-            ]), gl.STATIC_DRAW);
-            gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-            var vertexArray = gl.createVertexArray();
-            gl.bindVertexArray(vertexArray);
-            var vertexPosLocation = 0;
-            gl.enableVertexAttribArray(vertexPosLocation);
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexPosBuffer);
-            gl.vertexAttribPointer(vertexPosLocation, 2, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ARRAY_BUFFER, null);
-            gl.bindVertexArray(null);
-
-
-            function _frame(time) {
-                //draw
-                gl.useProgram(program);
+            map1Source.onload = () => {
+                var texture1 = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture1);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, map1Source);
 
 
 
+                // Create the path tracing program, grab the uniforms.
+                var program = createProgram(gl, trace_vertex, trace_fragment);
+                var timeLocation = gl.getUniformLocation(program, "uTime");
+                var map1Location = gl.getUniformLocation(program, "map1");
+                // var pLocation = gl.getUniformLocation(program, 'proj');
+                // var uniformgridLocation = gl.getUniformLocation(program, 'grid');
+                // var uniformtrisLocation = gl.getUniformLocation(program, 'tris');
+                // var uniformSeed = gl.getUniformLocation(program, 'inseed');
+                // var uniformCount = gl.getUniformLocation(program, 'incount');
+                // var uniformbbaLocation = gl.getUniformLocation(program, 'bbina');
+                // var uniformbbbLocation = gl.getUniformLocation(program, 'bbinb');
+                // var uniformresLocation = gl.getUniformLocation(program, 'resolution');
 
-                gl.uniform1f(timeLocation, 0.001 * time);
 
+                // Setup the quad that will drive the rendering.
+                var vertexPosBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexPosBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                    -2, 0,
+                    0, -2,
+                    2, 2
+                ]), gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-
+                var vertexArray = gl.createVertexArray();
                 gl.bindVertexArray(vertexArray);
+                var vertexPosLocation = 0;
+                gl.enableVertexAttribArray(vertexPosLocation);
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertexPosBuffer);
+                gl.vertexAttribPointer(vertexPosLocation, 2, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, null);
+                gl.bindVertexArray(null);
 
 
-                gl.clearColor(0, 0, 0, 1);
-                gl.clear(gl.COLOR_BUFFER_BIT);
-                gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+
+
+                function _frame(time) {
+                    gl.useProgram(program);
+
+
+
+
+                    // gl.uniform1f(timeLocation, 0.0);
+                    gl.uniform1f(timeLocation, 0.001 * time);
+                    gl.uniform1i(map1Location, 0);
+
+
+                    gl.bindVertexArray(vertexArray);
+
+
+                    gl.clearColor(0, 0, 0, 1);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+
+                    requestAnimationFrame(_frame);
+                };
 
                 requestAnimationFrame(_frame);
             };
 
-            requestAnimationFrame(_frame);
+
         }
     }
 }());

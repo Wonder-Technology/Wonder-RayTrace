@@ -7,6 +7,8 @@ var trace_fragment = `#version 300 es
 
 uniform float uTime;
 
+uniform sampler2D map1;
+
 #define FLT_MAX 3.402823466e+38
 #define T_MIN .001
 #define T_MAX FLT_MAX
@@ -105,11 +107,13 @@ struct Ray {
 
 struct HitRecord {
     bool hasHit;
+    float hitT;
     vec3 hitPoint;
     vec3 normal;
 
     Material material;
     vec3 color;
+    vec2 uv;
 };
 
 
@@ -173,11 +177,35 @@ vec3 randomPointInUnitSphere() {
 
 
 
+vec4 valueTexture(sampler2D sampler, vec2 uv){
+    return texture(sampler, uv);
+}
+
+
+    vec2 getSphereUv(vec3 p) {
+        float phi = atan(p.z, p.x);
+        float theta = asin(p.y);
+
+        float xOffsetAngle = 0.; //1.4;
+        float yOffsetAngle = 0.;
+
+        float u = 1. - (phi + xOffsetAngle + PI) / (2. * PI);
+        float v = (theta + yOffsetAngle + PI/2.) / PI;
+
+        return vec2(u, v);
+    }
+
+
+
 void scatter(HitRecord hitRecord, inout vec3 color, inout Ray ray) {
     if(hitRecord.material.type == LAMBERT) {
         // get lambertian random reflection direction
         ray.dir = hitRecord.normal + randomPointInUnitSphere();
-        color *= hitRecord.material.albedo * hitRecord.color;
+        // color *= hitRecord.material.albedo * hitRecord.color;
+        color *= hitRecord.material.albedo * valueTexture(
+            map1,
+            hitRecord.uv
+        ).rgb;
     }
 
     if(hitRecord.material.type == METAL) {
@@ -252,6 +280,8 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
 
             hitRecord.material = sphere.material;
             hitRecord.color = sphere.color;
+            hitRecord.hitT = t;
+            hitRecord.uv = getSphereUv(hitRecord.hitPoint);
 
             return true;
         }
@@ -266,6 +296,8 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
 
             hitRecord.material = sphere.material;
             hitRecord.color = sphere.color;
+            hitRecord.hitT = t;
+            hitRecord.uv = getSphereUv(hitRecord.hitPoint);
 
             return true;
         }
