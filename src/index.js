@@ -51,6 +51,7 @@ var index = (function () {
         var compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
         if (!compiled) {
             var error = gl.getShaderInfoLog(shader);
+            console.log(source);
             console.log('Failed to compile shader: ' + error);
             gl.deleteShader(shader);
             return null;

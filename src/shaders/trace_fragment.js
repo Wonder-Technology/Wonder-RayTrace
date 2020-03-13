@@ -9,6 +9,12 @@ uniform float uTime;
 
 uniform sampler2D map1;
 
+#define NX 900.0
+#define NY 450.0
+
+// #define NX 400.0
+// #define NY 200.0
+
 #define FLT_MAX 3.402823466e+38
 #define T_MIN .001
 #define T_MAX FLT_MAX
@@ -19,7 +25,7 @@ uniform sampler2D map1;
 
 
 #define MAX_HIT_DEPTH 3
-// #define NUM_SAMPLES 5
+#define NUM_SAMPLES 1
 #define NUM_SPHERES 3
 
 #define PI 3.141592653589793
@@ -122,7 +128,8 @@ struct HitRecord {
  */
 
 vec3 getRayDirection(Camera camera, vec2 uv) {
-    return camera.lowerLeft + uv.x * camera.horizontal + uv.y * camera.vertical;
+    // return camera.lowerLeft + uv.x * camera.horizontal + uv.y * camera.vertical;
+    return camera.lowerLeft + uv.x * camera.horizontal + uv.y * camera.vertical - camera.origin;
 }
 
 vec3 pointOnRay(Ray ray, float t) {
@@ -275,6 +282,7 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
             hitRecord.hasHit = true;
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
+                //TODO why / radiuse???
                 (hitRecord.hitPoint - sphere.center) / sphere.radius
             );
 
@@ -291,6 +299,7 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
             hitRecord.hasHit = true;
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
+                //TODO why / radiuse???
                 (hitRecord.hitPoint - sphere.center) / sphere.radius
             );
 
@@ -359,27 +368,49 @@ vec3 paint(in Ray ray, Sphere spheres[NUM_SPHERES]) {
 vec3 trace(in Camera camera, in Sphere spheres[NUM_SPHERES]) {
     vec3 color = vec3(0.0);
 
-    // // trace
-    // for(int i = 0; i < NUM_SAMPLES; i++) {
-    //     vec2 rUv = vec2( // jitter for anti-aliasing
-    //         uv.x + (rand() / uResolution.x),
-    //         uv.y + (rand() / uResolution.y)
-    //     );
+    vec2 uResolution = vec2(NX, NY);
 
-    //     Ray ray = Ray(camera.origin, getRayDirection(camera, rUv));
-    //     color += deNan(paint(ray, spheres));
-    // }
+    // trace
+    for(int i = 0; i < NUM_SAMPLES; i++) {
+        vec2 rUv = vec2( // jitter for anti-aliasing
+            uv.x + (rand() / uResolution.x),
+            uv.y + (rand() / uResolution.y)
+        );
 
-    // color /= float(NUM_SAMPLES);
-
-
-        Ray ray = Ray(camera.origin, getRayDirection(camera, uv));
-        
-        // why use deNan?
+        Ray ray = Ray(camera.origin, getRayDirection(camera, rUv));
         // color += deNan(paint(ray, spheres));
         color += paint(ray, spheres);
+    }
+
+    color /= float(NUM_SAMPLES);
+
+
+        // Ray ray = Ray(camera.origin, getRayDirection(camera, uv));
+        
+        // // why use deNan?
+        // // color += deNan(paint(ray, spheres));
+        // color += paint(ray, spheres);
 
     return color;
+}
+
+Camera buildCamera(vec3 lookFrom, vec3 lookAt, vec3 up, float fovy, float aspect){
+    vec3 u, v, w;
+
+    float theta = fovy * PI / 180.;
+    float half_height = tan(theta / 2.);
+    float half_width = half_height * aspect;
+    w = normalize(lookFrom - lookAt);
+    u = normalize(cross(up, w));
+    v = cross(w, u);
+
+
+    return Camera ( 
+        lookFrom,
+        2. * half_width * u,
+        2. * half_height * v,
+        lookFrom - half_width * u - half_height * v - w
+    );
 }
 
 
@@ -388,26 +419,44 @@ void main () {
     // set initial seed for stateful rng
     gRandSeed = uv;
 
-    Camera camera = Camera(
-        vec3(0.), // origin
-        vec3(4., 0., 0.), // horizontal
-        vec3(0., 2., 0.), // vertical
-        vec3(-2., -1., -1.) // lower left corner
+    // Camera camera = Camera(
+    //     vec3(0.), // origin
+    //     vec3(4., 0., 0.), // horizontal
+    //     vec3(0., 2., 0.), // vertical
+    //     vec3(-2., -1., -1.) // lower left corner
+    // );
+    Camera camera = buildCamera(
+        vec3(-2., 2., 1.),
+        // vec3(0., 0., 10.),
+        vec3(0., 0., -1.),
+        vec3(0., 1., 0.),
+        60.,
+        NX / NY
     );
 
     Sphere spheres[NUM_SPHERES];
     {
         spheres[0] = Sphere(
-            vec3(-0.1, -0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
+            // vec3(-0.1, -0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
+            vec3(0.0, -0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
             0.25, // radius
             ShinyMetalMaterial, // material
+            // vec3(0.5,0.5, 1.) // color
             vec3(1.) // color
         );
         spheres[1] = Sphere(
-            vec3(1., 0. + 0.25*0.5*abs(cos(uTime*3.+1.3*PI)), -1.), // sphere center
-            0.5, // radius
+            vec3(0., -100.5, -1.), // sphere center
+            90., // radius
             LambertMaterial, //ShinyMetalMaterial, // material
             vec3(0.2, 0.331, 0.5) // color
+        );
+        spheres[2] = Sphere(
+            // vec3(1.0, 1.0+ 0.25*0.5*abs(sin(uTime*3.)), -1.0), // sphere center
+            vec3(1.0, 0.8, -1.0), // sphere center
+            // vec3(1.0, 0.5 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
+            0.5, // radius
+            LambertMaterial, //ShinyMetalMaterial, // material
+            vec3(0.0, 0.0, 1.0) // color
         );
 
         // spheres[3] = Sphere(
@@ -424,12 +473,6 @@ void main () {
         //     vec3(1.)
 
         // );
-        spheres[2] = Sphere(
-            vec3(0., -100.5, -1.),
-            100.0,
-            LambertMaterial,
-            vec3(0.9, 0.3, 0.6)
-        );
     }
 
     color = trace(camera, spheres);
