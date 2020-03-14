@@ -189,8 +189,17 @@ vec4 valueTexture(sampler2D sampler, vec2 uv){
     return texture(sampler, uv);
 }
 
+// // proposed solution from 
+// // http://stackoverflow.com/questions/26070410/robust-atany-x-on-glsl-for-converting-xy-coordinate-to-angle
+// // swaps params when |x| <= |y|
+// float atan2(in float y, in float x) {
+//     bool s = (abs(x) > abs(y));
+//     return mix(3.14159265358979/2.0 - atan(x,y), atan(y,x), s);
+// }
+
 
     vec2 getSphereUv(vec3 p) {
+        // float phi = atan2(p.z, p.x);
         float phi = atan(p.z, p.x);
         float theta = asin(p.y);
 
@@ -283,13 +292,17 @@ bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, out HitReco
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
                 //TODO why / radiuse???
-                (hitRecord.hitPoint - sphere.center) / sphere.radius
+                // (hitRecord.hitPoint - sphere.center) / sphere.radius
+                (hitRecord.hitPoint - sphere.center) 
             );
 
             hitRecord.material = sphere.material;
             hitRecord.color = sphere.color;
             hitRecord.hitT = t;
-            hitRecord.uv = getSphereUv(hitRecord.hitPoint);
+            // hitRecord.uv = getSphereUv(hitRecord.hitPoint);
+            hitRecord.uv = getSphereUv(
+                (hitRecord.hitPoint - sphere.center) / sphere.radius
+            );
 
             return true;
         }
@@ -299,13 +312,17 @@ bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, out HitReco
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
                 //TODO why / radiuse???
-                (hitRecord.hitPoint - sphere.center) / sphere.radius
+                // (hitRecord.hitPoint - sphere.center) / sphere.radius
+                (hitRecord.hitPoint - sphere.center) 
             );
 
             hitRecord.material = sphere.material;
             hitRecord.color = sphere.color;
             hitRecord.hitT = t;
-            hitRecord.uv = getSphereUv(hitRecord.hitPoint);
+            // hitRecord.uv = getSphereUv(hitRecord.hitPoint);
+            hitRecord.uv = getSphereUv(
+                (hitRecord.hitPoint - sphere.center) / sphere.radius
+            );
 
             return true;
         }
@@ -477,8 +494,8 @@ void main () {
             vec3(0.2, 0.331, 0.5) // color
         );
         spheres[2] = Sphere(
-            // vec3(1.0, 1.0+ 0.25*0.5*abs(sin(uTime*3.)), -1.0), // sphere center
-            vec3(1.0, 0.8, -1.0), // sphere center
+            vec3(1.0, 0.5+ 0.25*0.5*abs(sin(uTime*2.)), -1.0), // sphere center
+            // vec3(1.0, 0.8, -1.0), // sphere center
             // vec3(1.0, 0.5 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
             0.5, // radius
             LambertMaterial, //ShinyMetalMaterial, // material
