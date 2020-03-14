@@ -55,6 +55,7 @@ struct Camera {
 #define METAL 2
 // #define DIALECTRIC 3
 
+
 struct Material {
     int type;
     vec3 albedo;
@@ -75,6 +76,7 @@ Material ShinyMetalMaterial = Material(
     0.01,
     0.
 );
+
 
 // Material FuzzyMetalMaterial = Material(
 //     METAL,
@@ -112,7 +114,6 @@ struct Ray {
 
 
 struct HitRecord {
-    bool hasHit;
     float hitT;
     vec3 hitPoint;
     vec3 normal;
@@ -265,7 +266,7 @@ void scatter(HitRecord hitRecord, inout vec3 color, inout Ray ray) {
 
 
 
-bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
+bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, out HitRecord hitRecord) {
     vec3 oc = ray.origin - sphere.center;
 
     float a = dot(ray.dir, ray.dir);
@@ -278,8 +279,7 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
         float t;
 
         t = (-b - sqrt(discriminant)) / (2. * a);
-        if(t < T_MAX && t > T_MIN) {
-            hitRecord.hasHit = true;
+        if(t < maxHitT && t > minHitT) {
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
                 //TODO why / radiuse???
@@ -295,8 +295,7 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
         }
 
         t = (-b + sqrt(discriminant)) / (2. * a);
-        if(t < T_MAX && t > T_MIN) {
-            hitRecord.hasHit = true;
+        if(t < maxHitT && t > minHitT) {
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
                 //TODO why / radiuse???
@@ -312,7 +311,6 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
         }
     }
 
-    hitRecord.hasHit = false;
     return false;
 }
 
@@ -321,14 +319,21 @@ bool hitSphere(Ray ray, Sphere sphere, out HitRecord hitRecord) {
  * World
  */
 
+// bool hitWorld(Ray ray, Sphere spheres[NUM_SPHERES], out HitRecord hitRecord) {
 bool hitWorld(Ray ray, Sphere spheres[NUM_SPHERES], out HitRecord hitRecord) {
+    float closest_so_far = T_MAX;
+    // HitRecord tempHitRecord;
+    bool isHit = false;
+
     for(int i = 0; i < NUM_SPHERES; i++) {
-        if(hitSphere(ray, spheres[i], /* out */ hitRecord)) {
-            return true;
+        if(hitSphere(ray, spheres[i], T_MIN, closest_so_far,  /* out */ hitRecord)) {
+            isHit = true;
+            closest_so_far = hitRecord.hitT;
+            // return true;
         }
     }
 
-    return false;
+    return isHit;
 }
 
 
@@ -347,10 +352,11 @@ vec3 paint(in Ray ray, Sphere spheres[NUM_SPHERES]) {
     vec3 color = vec3(1.0);
     HitRecord hitRecord;
 
-    hitWorld(ray, spheres, /* out => */ hitRecord);
+    // hitWorld(ray, spheres, /* out => */ hitRecord);
 
     for(int hitCounts = 0; hitCounts < MAX_HIT_DEPTH; hitCounts++) {
-        if(!hitRecord.hasHit) {
+        bool hasHit = hitWorld(ray, spheres, /* out => */ hitRecord);
+        if(!hasHit) {
             color *= background(ray.dir);
             break;
         }
@@ -358,7 +364,6 @@ vec3 paint(in Ray ray, Sphere spheres[NUM_SPHERES]) {
         ray.origin = hitRecord.hitPoint;
 
         scatter(hitRecord, /* out => */ color, /* out => */ ray);
-        hitWorld(ray, spheres, /* out => */ hitRecord);
     }
 
     return color;
@@ -425,6 +430,8 @@ void main () {
     //     vec3(0., 2., 0.), // vertical
     //     vec3(-2., -1., -1.) // lower left corner
     // );
+
+
     Camera camera = buildCamera(
         vec3(-2., 2., 1.),
         // vec3(0., 0., 10.),
@@ -433,6 +440,25 @@ void main () {
         60.,
         NX / NY
     );
+
+    // Camera camera = buildCamera(
+    //     vec3(0., 0., 5.),
+    //     // vec3(0., 0., 10.),
+    //     vec3(0., 0., -1.),
+    //     vec3(0., 1., 0.),
+    //     60.,
+    //     NX / NY
+    // );
+
+
+    // Camera camera = buildCamera(
+    //     vec3(0., 5., 5.),
+    //     // vec3(0., 0., 10.),
+    //     vec3(0., 0., 0.),
+    //     vec3(0., 1., 0.),
+    //     60.,
+    //     NX / NY
+    // );
 
     Sphere spheres[NUM_SPHERES];
     {
@@ -446,7 +472,7 @@ void main () {
         );
         spheres[1] = Sphere(
             vec3(0., -100.5, -1.), // sphere center
-            90., // radius
+            93., // radius
             LambertMaterial, //ShinyMetalMaterial, // material
             vec3(0.2, 0.331, 0.5) // color
         );
@@ -458,6 +484,13 @@ void main () {
             LambertMaterial, //ShinyMetalMaterial, // material
             vec3(0.0, 0.0, 1.0) // color
         );
+
+
+
+
+
+
+
 
         // spheres[3] = Sphere(
         //     vec3(0.1, 0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.7), // sphere center
