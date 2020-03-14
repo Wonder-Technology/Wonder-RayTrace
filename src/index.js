@@ -121,6 +121,8 @@ var index = (function () {
                 var program = createProgram(gl, trace_vertex, trace_fragment);
                 var timeLocation = gl.getUniformLocation(program, "uTime");
                 var map1Location = gl.getUniformLocation(program, "map1");
+                var cameraLookFromLocation = gl.getUniformLocation(program, "cameraLookFrom");
+                var cameraLookAtLocation = gl.getUniformLocation(program, "cameraLookAt");
                 // var pLocation = gl.getUniformLocation(program, 'proj');
                 // var uniformgridLocation = gl.getUniformLocation(program, 'grid');
                 // var uniformtrisLocation = gl.getUniformLocation(program, 'tris');
@@ -153,16 +155,26 @@ var index = (function () {
 
 
 
+                camera.init(canvas);
+
 
                 function _frame(time) {
+
+
                     gl.useProgram(program);
 
 
 
-
-                    // gl.uniform1f(timeLocation, 0.0);
-                    gl.uniform1f(timeLocation, 0.001 * time);
                     gl.uniform1i(map1Location, 0);
+                    gl.uniform1f(timeLocation, 0.001 * time);
+
+
+                    var [x, y, z] = camera.getLookFrom();
+                    console.log("LookFrom:", [x, y, z])
+                    gl.uniform3f(cameraLookFromLocation, x, y, z);
+                    var [x, y, z] = camera.getTarget();
+                    // console.log("target:", [x, y, z])
+                    gl.uniform3f(cameraLookAtLocation, x, y, z);
 
 
                     gl.bindVertexArray(vertexArray);

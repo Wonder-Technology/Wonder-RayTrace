@@ -9,6 +9,9 @@ uniform float uTime;
 
 uniform sampler2D map1;
 
+uniform vec3 cameraLookFrom;
+uniform vec3 cameraLookAt;
+
 #define NX 900.0
 #define NY 450.0
 
@@ -24,8 +27,8 @@ uniform sampler2D map1;
 // #define NUM_SPHERES 5
 
 
-#define MAX_HIT_DEPTH 10
-#define NUM_SAMPLES 5
+#define MAX_HIT_DEPTH 3
+#define NUM_SAMPLES 1
 #define NUM_SPHERES 3
 #define NUM_XYRECTS 1
 
@@ -520,9 +523,10 @@ void main() {
     // set initial seed for stateful rng
     gRandSeed = uv;
 
+
     Camera camera = buildCamera(
-        vec3(30., 5., 0.),
-        vec3(-1., 0., 0.),
+        cameraLookFrom,
+        cameraLookAt,
         vec3(0., 1., 0.),
         60.,
         NX / NY
