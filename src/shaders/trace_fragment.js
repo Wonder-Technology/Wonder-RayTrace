@@ -1,9 +1,9 @@
 var trace_fragment = `#version 300 es
-      precision highp float;
-      precision highp int;
+precision highp float;
+precision highp int;
 
     in vec2 uv;
-    out vec4 fragColor;
+out vec4 fragColor;
 
 uniform float uTime;
 
@@ -24,9 +24,10 @@ uniform sampler2D map1;
 // #define NUM_SPHERES 5
 
 
-#define MAX_HIT_DEPTH 3
-#define NUM_SAMPLES 1
+#define MAX_HIT_DEPTH 10
+#define NUM_SAMPLES 5
 #define NUM_SPHERES 3
+#define NUM_XYRECTS 1
 
 #define PI 3.141592653589793
 
@@ -54,26 +55,34 @@ struct Camera {
 #define LAMBERT 1
 #define METAL 2
 // #define DIALECTRIC 3
+#define DIFFUSE_LIGHT 3
 
 
 struct Material {
     int type;
     vec3 albedo;
     float fuzz;
-    float refIdx;
+    // float refIdx;
 };
 
 Material LambertMaterial = Material(
     LAMBERT,
     vec3(0.5),
-    0.,
     0.
+    // 0.
 );
 
 Material ShinyMetalMaterial = Material(
     METAL,
     vec3(0.8),
-    0.01,
+    0.01
+    // 0.
+);
+
+
+Material DiffuseLightMaterial = Material(
+    DIFFUSE_LIGHT,
+    vec3(4.0),
     0.
 );
 
@@ -107,6 +116,16 @@ struct Sphere {
 
 
 
+struct XYRect {
+    float x0;
+    float x1;
+    float y0;
+    float y1;
+    float k;
+    Material material;
+};
+
+
 struct Ray {
     vec3 origin;
     vec3 dir;
@@ -134,7 +153,7 @@ vec3 getRayDirection(Camera camera, vec2 uv) {
 }
 
 vec3 pointOnRay(Ray ray, float t) {
-    return ray.origin + t*ray.dir;
+    return ray.origin + t * ray.dir;
 }
 
 
@@ -143,8 +162,8 @@ float random(vec2 co) {
     highp float a = 12.9898;
     highp float b = 78.233;
     highp float c = 43758.5453;
-    highp float dt = dot(co.xy ,vec2(a,b));
-    highp float sn = mod(dt,3.14);
+    highp float dt = dot(co.xy, vec2(a, b));
+    highp float sn = mod(dt, 3.14);
 
     return fract(sin(sn) * c);
 }
@@ -198,42 +217,49 @@ vec4 valueTexture(sampler2D sampler, vec2 uv){
 // }
 
 
-    vec2 getSphereUv(vec3 p) {
-        // float phi = atan2(p.z, p.x);
-        float phi = atan(p.z, p.x);
-        float theta = asin(p.y);
+vec2 getSphereUv(vec3 p) {
+    // float phi = atan2(p.z, p.x);
+    float phi = atan(p.z, p.x);
+    float theta = asin(p.y);
 
-        float xOffsetAngle = 0.; //1.4;
-        float yOffsetAngle = 0.;
+    float xOffsetAngle = 0.; //1.4;
+    float yOffsetAngle = 0.;
 
-        float u = 1. - (phi + xOffsetAngle + PI) / (2. * PI);
-        float v = (theta + yOffsetAngle + PI/2.) / PI;
+    float u = 1. - (phi + xOffsetAngle + PI) / (2. * PI);
+    float v = (theta + yOffsetAngle + PI / 2.) / PI;
 
-        return vec2(u, v);
-    }
+    return vec2(u, v);
+}
 
 
 
-void scatter(HitRecord hitRecord, inout vec3 color, inout Ray ray) {
-    if(hitRecord.material.type == LAMBERT) {
+bool scatter(HitRecord hitRecord, out vec3 attenuation, inout Ray ray) {
+    if (hitRecord.material.type == LAMBERT) {
         // get lambertian random reflection direction
         ray.dir = hitRecord.normal + randomPointInUnitSphere();
-        // color *= hitRecord.material.albedo * hitRecord.color;
-        color *= hitRecord.material.albedo * valueTexture(
+        attenuation = hitRecord.material.albedo * valueTexture(
             map1,
             hitRecord.uv
         ).rgb;
+
+        return true;
     }
 
-    if(hitRecord.material.type == METAL) {
+    if (hitRecord.material.type == METAL) {
         vec3 reflected = reflect(normalize(ray.dir), hitRecord.normal);
         vec3 dir = reflected + hitRecord.material.fuzz * randomPointInUnitSphere();
 
         // dot(a, b) > 0 if a and b are pointing "in the same direction"
-        if(dot(dir, hitRecord.normal) > 0.) {
+        if (dot(dir, hitRecord.normal) > 0.) {
             ray.dir = dir;
-            color *= hitRecord.material.albedo * hitRecord.color;
+            attenuation = hitRecord.material.albedo * hitRecord.color;
         }
+
+        return true;
+    }
+
+    if (hitRecord.material.type == DIFFUSE_LIGHT) {
+        return false;
     }
 
     // if(hitRecord.material.type == DIALECTRIC) {
@@ -275,25 +301,25 @@ void scatter(HitRecord hitRecord, inout vec3 color, inout Ray ray) {
 
 
 
-bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, out HitRecord hitRecord) {
+bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, inout HitRecord hitRecord) {
     vec3 oc = ray.origin - sphere.center;
 
     float a = dot(ray.dir, ray.dir);
     float b = 2. * dot(oc, ray.dir);
     float c = dot(oc, oc) - sphere.radius * sphere.radius;
 
-    float discriminant = b*b - 4.*a*c;
+    float discriminant = b * b - 4. * a * c;
 
-    if(discriminant > 0.) {
+    if (discriminant > 0.) {
         float t;
 
         t = (-b - sqrt(discriminant)) / (2. * a);
-        if(t < maxHitT && t > minHitT) {
+        if (t < maxHitT && t > minHitT) {
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
                 //TODO why / radiuse???
                 // (hitRecord.hitPoint - sphere.center) / sphere.radius
-                (hitRecord.hitPoint - sphere.center) 
+                (hitRecord.hitPoint - sphere.center)
             );
 
             hitRecord.material = sphere.material;
@@ -308,12 +334,12 @@ bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, out HitReco
         }
 
         t = (-b + sqrt(discriminant)) / (2. * a);
-        if(t < maxHitT && t > minHitT) {
+        if (t < maxHitT && t > minHitT) {
             hitRecord.hitPoint = pointOnRay(ray, t);
             hitRecord.normal = normalize(
                 //TODO why / radiuse???
                 // (hitRecord.hitPoint - sphere.center) / sphere.radius
-                (hitRecord.hitPoint - sphere.center) 
+                (hitRecord.hitPoint - sphere.center)
             );
 
             hitRecord.material = sphere.material;
@@ -332,21 +358,53 @@ bool hitSphere(Ray ray, Sphere sphere, float minHitT, float maxHitT, out HitReco
 }
 
 
+bool hitXYRect(Ray ray, XYRect xyRect, float minHitT, float maxHitT, inout HitRecord hitRecord) {
+    float t = (xyRect.k - ray.origin.z) / ray.dir.z;
+
+    if(t < minHitT || t > maxHitT){
+        return false;
+    }
+
+    float x = ray.origin.x + t * ray.dir.x;
+    float y = ray.origin.y + t * ray.dir.y;
+
+    if(x < xyRect.x0 || x > xyRect.x1 || y < xyRect.y0 || y> xyRect.y1){
+        return false;
+    }
+
+    hitRecord.uv = vec2(
+        (x - xyRect.x0 ) / (xyRect.x1 - xyRect.x0),
+        (y - xyRect.y0 ) / (xyRect.y1 - xyRect.y0)
+    );
+    hitRecord.hitT = t;
+    hitRecord.material = xyRect.material;
+    hitRecord.hitPoint = pointOnRay(ray, t);
+    hitRecord.normal = vec3(0.,0.,1.);
+
+    return true;
+}
+
+
+
 /*
  * World
  */
 
-// bool hitWorld(Ray ray, Sphere spheres[NUM_SPHERES], out HitRecord hitRecord) {
-bool hitWorld(Ray ray, Sphere spheres[NUM_SPHERES], out HitRecord hitRecord) {
+bool hitWorld(Ray ray, Sphere spheres[NUM_SPHERES], XYRect xyRects[NUM_XYRECTS], out HitRecord hitRecord) {
     float closest_so_far = T_MAX;
-    // HitRecord tempHitRecord;
     bool isHit = false;
 
-    for(int i = 0; i < NUM_SPHERES; i++) {
-        if(hitSphere(ray, spheres[i], T_MIN, closest_so_far,  /* out */ hitRecord)) {
+    for (int i = 0; i < NUM_SPHERES; i++) {
+        if (hitSphere(ray, spheres[i], T_MIN, closest_so_far, hitRecord)) {
             isHit = true;
             closest_so_far = hitRecord.hitT;
-            // return true;
+        }
+    }
+
+    for (int i = 0; i < NUM_XYRECTS; i++) {
+        if (hitXYRect(ray, xyRects[i], T_MIN, closest_so_far, hitRecord)) {
+            isHit = true;
+            closest_so_far = hitRecord.hitT;
         }
     }
 
@@ -357,43 +415,64 @@ bool hitWorld(Ray ray, Sphere spheres[NUM_SPHERES], out HitRecord hitRecord) {
 vec3 background(vec3 rayDir) {
     vec3 normedDir = normalize(rayDir);
     // transpose y range from [-1, 1] to [0, 1]
-    float t = .5*(normedDir.y + 1.);
+    float t = .5 * (normedDir.y + 1.);
     // do linear interpolation of color
-    return (1. - t)*vec3(1.) + t*vec3(.4, .4, .7); //vec3(.5, .7, 1.);
+    return (1. - t) * vec3(1.) + t * vec3(.4, .4, .7); //vec3(.5, .7, 1.);
 }
 
 
+vec4 emitted(Material material, vec2 uv){
+    if (material.type == DIFFUSE_LIGHT) {
+        // return valueTexture(
+        //     map1,
+        //     uv
+        // );
+        return vec4(4.0);
+    }
+
+    return vec4(0.0);
+}
+
 
 // colorize
-vec3 paint(in Ray ray, Sphere spheres[NUM_SPHERES]) {
+vec3 paint(Ray ray, Sphere spheres[NUM_SPHERES], XYRect xyRects[NUM_XYRECTS]) {
     vec3 color = vec3(1.0);
+    vec3 attenuation;
     HitRecord hitRecord;
 
-    // hitWorld(ray, spheres, /* out => */ hitRecord);
-
-    for(int hitCounts = 0; hitCounts < MAX_HIT_DEPTH; hitCounts++) {
-        bool hasHit = hitWorld(ray, spheres, /* out => */ hitRecord);
-        if(!hasHit) {
-            color *= background(ray.dir);
+    for (int hitCounts = 0; hitCounts < MAX_HIT_DEPTH; hitCounts++) {
+        bool hasHit = hitWorld(ray, spheres, xyRects, hitRecord);
+        if (!hasHit) {
+            // color *= background(ray.dir);
+            color = vec3(0.0);
             break;
         }
 
         ray.origin = hitRecord.hitPoint;
 
-        scatter(hitRecord, /* out => */ color, /* out => */ ray);
+        vec3 emittedColor = emitted(hitRecord.material, hitRecord.uv).rgb;
+
+        if(scatter(hitRecord, attenuation, ray)){
+            color = emittedColor + color * attenuation;
+        }
+        else{
+            // color = emittedColor + color;
+            color *= emittedColor;
+            break;
+        }
     }
 
     return color;
 }
 
 
-vec3 trace(in Camera camera, in Sphere spheres[NUM_SPHERES]) {
+vec3 trace(Camera camera, Sphere spheres[NUM_SPHERES], XYRect xyRects[NUM_XYRECTS]) {
     vec3 color = vec3(0.0);
 
     vec2 uResolution = vec2(NX, NY);
 
     // trace
-    for(int i = 0; i < NUM_SAMPLES; i++) {
+    for (int i = 0; i < NUM_SAMPLES; i++) {
         vec2 rUv = vec2( // jitter for anti-aliasing
             uv.x + (rand() / uResolution.x),
             uv.y + (rand() / uResolution.y)
@@ -401,17 +480,17 @@ vec3 trace(in Camera camera, in Sphere spheres[NUM_SPHERES]) {
 
         Ray ray = Ray(camera.origin, getRayDirection(camera, rUv));
         // color += deNan(paint(ray, spheres));
-        color += paint(ray, spheres);
+        color += paint(ray, spheres, xyRects);
     }
 
     color /= float(NUM_SAMPLES);
 
 
-        // Ray ray = Ray(camera.origin, getRayDirection(camera, uv));
-        
-        // // why use deNan?
-        // // color += deNan(paint(ray, spheres));
-        // color += paint(ray, spheres);
+    // Ray ray = Ray(camera.origin, getRayDirection(camera, uv));
+
+    // // why use deNan?
+    // // color += deNan(paint(ray, spheres));
+    // color += paint(ray, spheres);
 
     return color;
 }
@@ -427,7 +506,7 @@ Camera buildCamera(vec3 lookFrom, vec3 lookAt, vec3 up, float fovy, float aspect
     v = cross(w, u);
 
 
-    return Camera ( 
+    return Camera(
         lookFrom,
         2. * half_width * u,
         2. * half_height * v,
@@ -436,96 +515,60 @@ Camera buildCamera(vec3 lookFrom, vec3 lookAt, vec3 up, float fovy, float aspect
 }
 
 
-void main () {
+void main() {
     vec3 color;
     // set initial seed for stateful rng
     gRandSeed = uv;
 
-    // Camera camera = Camera(
-    //     vec3(0.), // origin
-    //     vec3(4., 0., 0.), // horizontal
-    //     vec3(0., 2., 0.), // vertical
-    //     vec3(-2., -1., -1.) // lower left corner
-    // );
-
-
     Camera camera = buildCamera(
-        vec3(-2., 2., 1.),
-        // vec3(0., 0., 10.),
-        vec3(0., 0., -1.),
+        vec3(30., 5., 0.),
+        vec3(-1., 0., 0.),
         vec3(0., 1., 0.),
         60.,
         NX / NY
     );
 
-    // Camera camera = buildCamera(
-    //     vec3(0., 0., 5.),
-    //     // vec3(0., 0., 10.),
-    //     vec3(0., 0., -1.),
-    //     vec3(0., 1., 0.),
-    //     60.,
-    //     NX / NY
-    // );
-
-
-    // Camera camera = buildCamera(
-    //     vec3(0., 5., 5.),
-    //     // vec3(0., 0., 10.),
-    //     vec3(0., 0., 0.),
-    //     vec3(0., 1., 0.),
-    //     60.,
-    //     NX / NY
-    // );
-
     Sphere spheres[NUM_SPHERES];
     {
         spheres[0] = Sphere(
             // vec3(-0.1, -0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
-            vec3(0.0, -0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
-            0.25, // radius
-            ShinyMetalMaterial, // material
-            // vec3(0.5,0.5, 1.) // color
+            vec3(0., -1000., 0.), // sphere center
+            1000.,
+            LambertMaterial, // material
             vec3(1.) // color
         );
         spheres[1] = Sphere(
-            vec3(0., -100.5, -1.), // sphere center
-            93., // radius
-            LambertMaterial, //ShinyMetalMaterial, // material
-            vec3(0.2, 0.331, 0.5) // color
+            vec3(0., 2.0 + 0.5 * abs(sin(uTime * 2.)), 0.), // sphere center
+            2.,
+            LambertMaterial, // material
+            vec3(1.) // color
         );
         spheres[2] = Sphere(
-            vec3(1.0, 0.5+ 0.25*0.5*abs(sin(uTime*2.)), -1.0), // sphere center
-            // vec3(1.0, 0.8, -1.0), // sphere center
-            // vec3(1.0, 0.5 + 0.25*0.5*abs(sin(uTime*3.)), -1.), // sphere center
-            0.5, // radius
-            LambertMaterial, //ShinyMetalMaterial, // material
-            vec3(0.0, 0.0, 1.0) // color
+            vec3(0.0, 10.0, 2.5 * abs(sin(uTime * 4.))), // sphere center
+            2.,
+            DiffuseLightMaterial, // material
+            vec3(1.) // color
         );
-
-
-
-
-
-
-
-
-        // spheres[3] = Sphere(
-        //     vec3(0.1, 0.25 + 0.25*0.5*abs(sin(uTime*3.)), -1.7), // sphere center
-        //     0.5, // radius
-        //     FuzzyMetalMaterial, // material
-        //     vec3(0.9, 0.9, 0.9) // color
-        // );
-
-        // spheres[2] = Sphere(
-        //     vec3(-1., 0.25*abs(sin(uTime*3.+1.5*PI)), -1.25), // sphere center
-        //     0.5, // radius
-        //     GlassMaterial,
-        //     vec3(1.)
-
-        // );
     }
 
-    color = trace(camera, spheres);
+
+    XYRect xyRects[NUM_XYRECTS];
+    {
+        xyRects[0] = XYRect(
+            -5.,
+            5.,
+            1.,
+            3.,
+            -3.,
+            DiffuseLightMaterial
+        );
+    }
+
+
+
+
+
+    color = trace(camera, spheres, xyRects);
     color = sqrt(color); // correct gamma
 
     fragColor = vec4(color, 1.);
